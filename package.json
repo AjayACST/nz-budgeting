@@ -10,8 +10,17 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@nuxtjs/kinde": "0.1.11",
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "akahu": "^1.15.3",
+    "flowbite": "^2.5.2",
+    "mariadb": "^3.4.0",
     "nuxt": "^3.14.1592",
+    "typescript": "^5.7.2",
     "vue": "latest",
     "vue-router": "latest"
+  },
+  "devDependencies": {
+    "nuxt-cron": "^1.7.0"
   }
 }

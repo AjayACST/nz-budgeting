@@ -7,5 +7,8 @@ export default defineNuxtConfig({
     runOnInit: true,
     timeZone: 'Pacific/Auckland',
     jobsDir: 'cron'
+  },
+  kinde: {
+    audience: 'spendcents.io/api/v1'
   }
 })

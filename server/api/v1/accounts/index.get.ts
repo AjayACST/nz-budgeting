@@ -2,8 +2,9 @@ import {H3Event} from "h3";
 import auth from "~/server/auth";
 import {getConnection} from "~/server/database";
 import {AccountsTypes} from "~/types/accounts.types";
+import {BaseAPIArray} from "~/types/api.types";
 
-export default defineEventHandler(async (event: H3Event) => {
+export default defineEventHandler(async (event: H3Event): Promise<BaseAPIArray<AccountsTypes>> => {
     const user = await auth(event)
     const connection = await getConnection();
     console.log(user)

@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, Ref } from 'vue';
+import { ref, type Ref } from 'vue';
 import { definePageMeta, useAsyncData, useFetch } from '#imports';
-import type { ApiGetAccounts } from '~/types/accounts.types';
+import type {BaseAPIArray} from "~/types/api.types";
+import type {AccountsTypes} from "~/types/accounts.types";
 
 definePageMeta({
   middleware: ['auth-logged-in']
 });
 
 // Define a ref for accounts
-const accounts: Ref<ApiGetAccounts | null> = ref(null);
+const accounts: Ref<AccountsTypes[] | null> = ref(null);
 
 // Fetch the token using useAsyncData
 const { data: tokenData, error: tokenError } = await useAsyncData(async () => {
@@ -26,7 +27,7 @@ async function getAccounts() {
     return; // Prevent fetching accounts if the token is not available
   }
 
-  const { data: accountsData, error: accountsError } = await useFetch<ApiGetAccounts>('/api/v1/accounts', {
+  const { data: accountsData, error: accountsError } = await useFetch<BaseAPIArray<AccountsTypes>>('/api/v1/accounts', {
     headers: {
       'Authorization': `Bearer ${tokenData.value}`
     }
@@ -37,7 +38,12 @@ async function getAccounts() {
     return;
   }
 
-  accounts.value = accountsData.value;
+  if (!accountsData.value) {
+    console.error('No data')
+    return
+  }
+
+  accounts.value = accountsData.value.data;
 }
 
 await getAccounts();
@@ -57,10 +63,10 @@ await getAccounts();
         </div>
         <div class="flow-root">
           <ul role="list" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <li class="py-3 sm:py-4" v-for="account in accounts?.data">
+            <li class="py-3 sm:py-4" v-for="account in accounts">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
-                  <img class="w-8 h-8 rounded-full" :src="account.logo" alt="Neil image">
+                  <img class="w-8 h-8 rounded-full" :src="account.logo" alt="Bank Logo">
                 </div>
                 <div class="flex-1 min-w-0 ms-4">
                   <p class="text-sm font-medium text-gray-900 truncate dark:text-white">

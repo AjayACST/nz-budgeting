@@ -2,19 +2,28 @@
 import {Splitpanes, Pane} from "splitpanes";
 import 'splitpanes/dist/splitpanes.css'
 import Plus from "~/components/icons/plus.vue";
-import {type DrawerOptions, type InstanceOptions} from "flowbite";
+import {type DatepickerOptions, type DrawerOptions, type InstanceOptions} from "flowbite";
 import {useFetch} from "#imports";
 import type {BaseAPIArray} from "~/types/api.types";
 import type {NZFCCGroup, NZFCCServices} from "~/types/nzfcc.types";
 import ArrowRight from "~/components/icons/arrow-right.vue";
+import type {CreateBudget} from "~/types/budgets.types";
+import {DateTime} from "luxon";
+import {BaseAPI} from "@kinde-oss/kinde-typescript-sdk";
 
 const drawer: Ref<Drawer | null> = ref(null)
+const datepicker: Ref<Datepicker | null> = ref(null)
 
-const showCategoryAdd: Ref<Boolean> = ref(true)
+const showCategoryAdd: Ref<Boolean> = ref(false)
+const showWarning: Ref<Boolean> = ref(false)
 const nzfccGroups: Ref<NZFCCGroup[]> = ref([])
 const selectedGroup: Ref<NZFCCGroup | null> = ref(null)
 
 const budgetGroups: Ref<NZFCCGroup[]> = ref([])
+
+const editBudget: Ref<CreateBudget | null> = ref(null)
+
+setBlankBudget()
 
 // Fetch the token using useAsyncData
 const { data: tokenData, error: tokenError } = await useAsyncData(async () => {
@@ -27,6 +36,14 @@ if (tokenError.value) {
 
 onMounted(() => {
   const $targetEL: HTMLElement | null = document.getElementById('budget-edit-drawer')
+  const $targetDate: HTMLElement | null = document.getElementById('datepicker-start-date')
+
+  const dateOptions: DatepickerOptions = {
+    autohide: false,
+    format: 'dd/mm/yyyy',
+    buttons: true,
+    autoSelectToday: 1
+  }
 
   const drawOptions: DrawerOptions = {
     placement: 'right',
@@ -37,8 +54,15 @@ onMounted(() => {
     override: true
   }
 
+  const dateInstnace: InstanceOptions = {
+    id: 'datepicker-start-date',
+    override: true
+  }
+
   drawer.value = new Drawer($targetEL, drawOptions, instanceOptions)
   drawer.value.show()
+
+  datepicker.value = new Datepicker($targetDate, dateOptions, dateInstnace)
 })
 
 await loadCategories()
@@ -91,6 +115,48 @@ function selectService(group: NZFCCGroup, service: NZFCCServices) {
   }
 }
 
+function setBlankBudget() {
+  editBudget.value = {
+    name: '',
+    description: '',
+    amount: 0,
+    start_date: '',
+    refresh_every: 'week',
+    budgetIDs: ['']
+  }
+}
+
+async function submitBudget() {
+   if (budgetGroups.value.length == 0) {
+      showWarning.value = true
+     return
+   }
+
+   // Get service IDs
+  const serviceIds: string[] = budgetGroups.value.flatMap(group => group.groupServices.map(service => service.id))
+
+  // setup submit values
+
+  editBudget.value!.start_date = DateTime.fromJSDate(datepicker.value.getDate()).toUTC().toISO() || DateTime.now().toUTC().toISO()
+  editBudget.value!.budgetIDs = serviceIds
+
+  const {data: submitRes, error: submitErr} = await useFetch<BaseAPI>('/api/v1/budgets/create', {
+    method: "POST",
+    headers: {
+      'Authorization': `Bearer ${tokenData.value}`
+    },
+    body: editBudget.value
+  })
+
+  if (submitErr.value) {
+    console.error('Error fetching accounts: ', submitErr.value)
+    return
+  }
+
+  // add in refresh function
+  drawer.value.hide()
+}
+
 </script>
 
 <template>
@@ -99,7 +165,7 @@ function selectService(group: NZFCCGroup, service: NZFCCServices) {
     <div class="p-4 mt-14">
       <Splitpanes class="default-theme">
         <Pane>
-          <button @click="drawer.show()" type="button" class="px-5 py-2.5 text-sm font-medium text-white inline-flex items-center bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+          <button @click="drawer.show(); setBlankBudget()" type="button" class="px-5 py-2.5 text-sm font-medium text-white inline-flex items-center bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
             <plus class="w-3.5 h-3.5 text-white me-2"/>
             Create New Budget
           </button>
@@ -136,44 +202,63 @@ function selectService(group: NZFCCGroup, service: NZFCCServices) {
         <!--        Drawer body -->
         <div class="flex gap-5 basis-1/2">
           <div id="new-budget-form-main">
-            <div class="mb-5">
-              <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Name</label>
-              <input type="text" id="name" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g. Transport" required />
-            </div>
-            <div class="mb-5">
-              <label for="amount" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Amount</label>
-              <input type="number" min="0" id="amount" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="$200" required />
-            </div>
-            <div class="relative max-w-sm mb-5">
-              <label for="amount" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Start Date</label>
-              <div class="absolute inset-y-12 start-0 flex items-center ps-3 pointer-events-none">
-                <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z"/>
-                </svg>
+            <form @submit.prevent="submitBudget">
+              <div class="mb-5">
+                <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Name</label>
+                <input v-model="editBudget!.name" type="text" id="name" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g. Transport" required />
               </div>
-              <input id="datepicker-actions" required datepicker datepicker-buttons datepicker-autoselect-today type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-10 p-2.5  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Select date">
-            </div>
-            <div class="mb-5">
-              <label for="message" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Description</label>
-              <textarea id="message" rows="4" class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Give it a helpful description (optional)"></textarea>
-            </div>
 
-            <button type="button" @click="showCategoryAdd = !showCategoryAdd" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-              Choose Categories
-              <svg class="rtl:rotate-180 w-3.5 h-3.5 ms-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
-                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
-              </svg>
-            </button>
+              <div class="mb-5">
+                <label for="amount" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Amount</label>
+                <input v-model="editBudget!.amount" type="number" min="0" id="amount" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="$200" required />
+              </div>
 
-            <p class="block pt-2 text-sm font-medium text-gray-900">Categories in budget</p>
-            <ul class="space-y-4 text-gray-500 list-disc list-inside dark:text-gray-400">
-              <li v-for="group in budgetGroups">
-                {{ group.groupName }}
-                <ul class="ps-5 mt-1 space-y-1 list-disc list-inside">
-                  <li v-for="service in group.groupServices">{{ service.name }}</li>
-                </ul>
-              </li>
-            </ul>
+              <div class="relative max-w-sm mb-5">
+                <label for="amount" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Start Date</label>
+                <div class="absolute inset-y-12 start-0 flex items-center ps-3 pointer-events-none">
+                  <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z"/>
+                  </svg>
+                </div>
+                <input id="datepicker-start-date" required type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-10 p-2.5  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Select date">
+              </div>
+
+              <div class="mb-5">
+                <label for="countries" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Refresh Cycle</label>
+                <select id="countries" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                  <option value="week">Weekly</option>
+                  <option value="fortnight">Fortnightly</option>
+                  <option value="month">Monthly</option>
+                  <option value="quarter">Quarterly</option>
+                  <option value="year">Yearly</option>
+                </select>
+              </div>
+
+              <div class="mb-5">
+                <label for="message" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Budget Description</label>
+                <textarea v-model="editBudget!.description" id="message" rows="4" class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Give it a helpful description (optional)"></textarea>
+              </div>
+
+              <button type="button" @click="showCategoryAdd = !showCategoryAdd" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                Choose Categories
+                <svg class="rtl:rotate-180 w-3.5 h-3.5 ms-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
+                </svg>
+              </button>
+
+              <p class="block pt-2 text-sm font-medium text-gray-900">Categories in budget</p>
+              <ul class="space-y-4 text-gray-500 list-disc list-inside dark:text-gray-400">
+                <li v-for="group in budgetGroups">
+                  {{ group.groupName }}
+                  <ul class="ps-5 mt-1 space-y-1 list-disc list-inside">
+                    <li v-for="service in group.groupServices">{{ service.name }}</li>
+                  </ul>
+                </li>
+              </ul>
+              <button type="submit" class="mt-5 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                Create Budget
+              </button>
+            </form>
           </div>
 
           <div v-if="showCategoryAdd" id="new-budget-form-categories">
@@ -206,12 +291,11 @@ function selectService(group: NZFCCGroup, service: NZFCCServices) {
               </li>
             </ul>
           </div>
-
         </div>
       </div>
-
     </div>
   </div>
+  <toasts-warning warning-text="Can't create a budget with no categories!" v-if="showWarning" @click="showWarning = false" class="hover:cursor-pointer"/>
 </template>
 
 <style scoped>

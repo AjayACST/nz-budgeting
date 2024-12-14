@@ -7,7 +7,7 @@ import {useFetch} from "#imports";
 import type {BaseAPIArray} from "~/types/api.types";
 import type {NZFCCGroup, NZFCCServices} from "~/types/nzfcc.types";
 import ArrowRight from "~/components/icons/arrow-right.vue";
-import type {CreateBudget} from "~/types/budgets.types";
+import type {CreateBudget, BudgetList} from "~/types/budgets.types";
 import {DateTime} from "luxon";
 import {BaseAPI} from "@kinde-oss/kinde-typescript-sdk";
 
@@ -16,12 +16,17 @@ const datepicker: Ref<Datepicker | null> = ref(null)
 
 const showCategoryAdd: Ref<Boolean> = ref(false)
 const showWarning: Ref<Boolean> = ref(false)
+// List of groups from API
 const nzfccGroups: Ref<NZFCCGroup[]> = ref([])
+// The selected group, used to show further categories
 const selectedGroup: Ref<NZFCCGroup | null> = ref(null)
 
+// The currently selected budgets for edit mode
 const budgetGroups: Ref<NZFCCGroup[]> = ref([])
 
 const editBudget: Ref<CreateBudget | null> = ref(null)
+
+const budgetList: Ref<BudgetList[]> = ref([])
 
 setBlankBudget()
 
@@ -60,12 +65,11 @@ onMounted(() => {
   }
 
   drawer.value = new Drawer($targetEL, drawOptions, instanceOptions)
-  drawer.value.show()
-
   datepicker.value = new Datepicker($targetDate, dateOptions, dateInstnace)
 })
 
 await loadCategories()
+await loadBudgets()
 
 async function loadCategories() {
   if (!tokenData.value) {
@@ -80,13 +84,36 @@ async function loadCategories() {
   })
 
   if (fetchError.value) {
-    console.error('Error fetching accounts: ', fetchError.value)
+    console.error('Error fetching categories: ', fetchError.value)
     return
   }
   if (!groups.value) {
     return
   }
   nzfccGroups.value = groups.value.data;
+}
+
+async function loadBudgets() {
+  if (!tokenData.value) {
+    console.error('Token is not available')
+    return
+  }
+  const {data: budgets, error: fetchError} = await useFetch<BaseAPIArray<BudgetList>>('/api/v1/budgets', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${tokenData.value}`
+    }
+  })
+
+  if (fetchError.value) {
+    console.error('Error fetching budgets: ', fetchError.value)
+    return
+  }
+
+  if (!budgets.value) {
+    return
+  }
+  budgetList.value = budgets.value.data
 }
 
 function selectService(group: NZFCCGroup, service: NZFCCServices) {
@@ -170,20 +197,24 @@ async function submitBudget() {
             Create New Budget
           </button>
           <ul role="list" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <li class="py-3 sm:py-4 hover:cursor-pointer hover:bg-gray-300 transition-colors hover:rounded-sm p-4" @click="console.log('hello')">
+            <li v-for="budget of budgetList" class="py-3 sm:py-4 hover:cursor-pointer hover:bg-gray-300 transition-colors hover:rounded-md p-4" @click="console.log('hello')">
               <div class="flex items-center">
-                <div class="flex-1 min-w-0 ms-4">
+                <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-gray-900 truncate dark:text-white">
-                    Budget Name Here
+                    {{ budget.name }}
                   </p>
                   <p class="text-sm text-gray-500 truncate dark:text-gray-400">
-                    Name Here
+                    {{ budget.description }}
                   </p>
                 </div>
                 <div class="inline-flex items-center text-base font-semibold text-gray-900 dark:text-white">
-                  $200 / $400 remaning
+                  ${{budget.spent}} / ${{budget.amount}} remaining
                 </div>
               </div>
+              <div class="pt-2">
+                <progress-bar :percent="Math.round((budget.spent / budget.amount) * 100)"/>
+              </div>
+
             </li>
           </ul>
         </Pane>

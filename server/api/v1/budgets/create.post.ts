@@ -21,7 +21,7 @@ export default defineEventHandler(async (event): Promise<BaseAPI> => {
         const insertData = [budgetID[0].id, groupId]
         await connection.query(sqlInsert, insertData)
     }
-
+    await connection.release()
     return {
         status: "ok"
     }

@@ -28,6 +28,7 @@ export default defineEventHandler(async (event: H3Event): Promise<BaseAPIArray<A
             'a.user_id = ?';
 
     const data: AccountsTypes[] = await connection.query(sql, [user.sub])
+    await connection.release()
     return {
         status: "ok",
         data: data

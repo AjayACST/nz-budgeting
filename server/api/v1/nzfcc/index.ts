@@ -23,7 +23,7 @@ export default defineEventHandler(async (event: H3Event): Promise<BaseAPIArray<N
     }, {})
 
     const result: NZFCCGroup[] = Object.values(groupedServices)
-
+    await connection.release()
     return {
         status: 'ok',
         data: result

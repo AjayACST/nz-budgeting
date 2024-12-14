@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@influxdata/influxdb-client": "^1.35.0",
     "@nuxtjs/kinde": "0.1.11",
     "@nuxtjs/tailwindcss": "^6.12.2",
     "@types/splitpanes": "^2.2.6",

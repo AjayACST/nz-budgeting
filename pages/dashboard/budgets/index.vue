@@ -182,6 +182,7 @@ async function submitBudget() {
 
   // add in refresh function
   drawer.value.hide()
+  await loadBudgets()
 }
 
 </script>
